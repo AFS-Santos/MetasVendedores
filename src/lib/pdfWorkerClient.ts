@@ -15,7 +15,7 @@ import type { SortMode } from './formatters'
 const WORKER_URL = import.meta.env.VITE_PDF_WORKER_URL?.replace(/\/$/, '') || ''
 
 interface ExportRequest {
-  type: 'ranking' | 'podio' | 'filial' | 'todas'
+  type: 'ranking' | 'podio' | 'filial' | 'todas' | 'encerramento'
   vendedores: Vendedor[]
   regras: Regras
   sortMode: SortMode
