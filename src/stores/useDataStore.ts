@@ -106,21 +106,21 @@ export const useDataStore = create<DataState>((set, get) => ({
 
     set({ syncStatus: 'loading', syncError: null })
     try {
-      const data = await fetchVendedores(sheetsUrl)
+      // Busca vendedores e fotos em paralelo — reduz tempo total de sync
+      const [data, fotosData] = await Promise.all([
+        fetchVendedores(sheetsUrl),
+        fetchDriveFotos(sheetsUrl).catch(() => null),
+      ])
+
       const vendedores = data.vendedores
       set({ vendedores, syncStatus: 'ok', lastSyncTime: Date.now() })
       saveToStorage('mt_vend', vendedores)
 
       preloadR2Photos(vendedores).catch(() => {})
 
-      try {
-        const fotosData = await fetchDriveFotos(sheetsUrl)
-        if (fotosData?.fotos) {
-          set({ drivePhotos: fotosData.fotos })
-          saveToStorage('mt_drive_fotos', fotosData.fotos)
-        }
-      } catch (e) {
-        console.error('syncDrivePhotos:', e)
+      if (fotosData?.fotos) {
+        set({ drivePhotos: fotosData.fotos })
+        saveToStorage('mt_drive_fotos', fotosData.fotos)
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido'

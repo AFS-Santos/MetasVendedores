@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { useDataStore } from '../stores/useDataStore'
 
-// Sync a cada 30s quando visível, máximo 5min em background
-const SYNC_INTERVAL   = 30_000
-const SYNC_BG_MAX     = 300_000
-const VISIBILITY_MIN  = 15_000   // re-sync se ficar 15s sem foco
+// Sync a cada 60s quando visível, máximo 10min em background
+// Intervalo maior reduz cold starts desnecessários no Apps Script
+const SYNC_INTERVAL   = 60_000
+const SYNC_BG_MAX     = 600_000
+const VISIBILITY_MIN  = 30_000   // re-sync se ficar 30s sem foco
 
 export function useAutoSync() {
   const sheetsUrl     = useDataStore(s => s.sheetsUrl)
