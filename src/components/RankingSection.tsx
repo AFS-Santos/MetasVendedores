@@ -182,10 +182,22 @@ export function RankingSection({ type, onEdit }: RankingSectionProps) {
                   const isBonus   = bonusId === v.id
                   const opacity   = type === 'markup' && !isEleg && !campanhaEncerrada ? 0.38 : 1
 
-                  // Badge abaixo do nome
+                  // Badge abaixo do nome — podem aparecer múltiplos (Top3 + Bônus)
                   let badge: React.ReactNode = null
                   if (type === 'markup') {
-                    if (isPodium) {
+                    if (isPodium && isBonus) {
+                      // Acumula: está no pódio E é o vencedor do bônus
+                      badge = (
+                        <span className="inline-flex items-center gap-1 flex-wrap">
+                          <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-gold/15 text-gold border border-gold/25 rounded px-1.5 py-px font-bold">
+                            🏆 Top 3
+                          </span>
+                          <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-gold/10 text-gold border border-gold/20 rounded px-1.5 py-px font-bold">
+                            ⭐ Bônus R$ {Number(regras.bonusMk).toLocaleString('pt-BR')}
+                          </span>
+                        </span>
+                      )
+                    } else if (isPodium) {
                       badge = (
                         <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-gold/15 text-gold border border-gold/25 rounded px-1.5 py-px font-bold">
                           🏆 Top 3

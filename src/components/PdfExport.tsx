@@ -33,6 +33,7 @@ export function PdfExport({ open, onClose, initialMode }: PdfExportProps) {
     if (open && initialMode !== null && initialMode !== 'filial') {
       setMode(initialMode)
       setSelectedFilial(null)
+      setPdfSort('pct')
     }
   }, [open, initialMode])
 
@@ -273,7 +274,11 @@ export function PdfExport({ open, onClose, initialMode }: PdfExportProps) {
               </div>
             </div>
           ) : (
-            <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+            <div
+              key={`${mode}-${pdfSort}-${selectedFilial}`}
+              style={{ animation: 'fadeIn 0.25s ease' }}
+              dangerouslySetInnerHTML={{ __html: htmlContent }}
+            />
           )}
         </div>
       </div>

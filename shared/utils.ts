@@ -87,7 +87,7 @@ export interface RankingData {
   podiumMarkup: [Vendedor?, Vendedor?, Vendedor?]
 
   // Bônus markup
-  bonusMarkupVend: Vendedor | null   // melhor mk elegível (qualquer posição)
+  bonusMarkupVend: Vendedor | null   // melhor mk elegível (pode ser do pódio ou fora)
   bonusMarkupFora: Vendedor[]        // 4º/5º/6º elegíveis fora do pódio markup
 
   // Elegíveis ordenados por ranking (para PDF encerramento)
@@ -146,6 +146,8 @@ export function prepareRankingData(
 
   // ── Bônus markup ──
   const elegiveisMarkup = sortVendedores(elegiveis, 'markup')
+
+  // O bônus vai para o MELHOR markup elegível (pode ser do pódio ou fora)
   const bonusMarkupVend = elegiveisMarkup[0] ?? null
 
   const podiumMarkupIds = new Set(podiumMarkup.map(v => v?.id))

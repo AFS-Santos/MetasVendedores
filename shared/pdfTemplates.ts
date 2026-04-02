@@ -398,12 +398,22 @@ export function generatePdfHtml(req: PdfRequest): string {
           null, r2BaseUrl)
       }).join('')
 
-      const cardsBonus = [0, 1, 2].map(i => {
-        const v     = data.bonusMarkupFora[i]
+      // bonusMarkupVend: melhor elegível geral (pode ser do pódio) — vencedor real do bônus
+      // bonusMarkupFora: elegíveis fora do pódio (2º/3º fora, para contexto)
+      const podiumMarkupSize = data.podiumMarkup.filter(Boolean).length
+      const bonusVend = data.bonusMarkupVend
+      // Monta lista: [vencedor do bônus, 2º fora, 3º fora]
+      const bonusList: (typeof bonusVend)[] = [
+        bonusVend,
+        data.bonusMarkupFora[bonusVend && data.bonusMarkupFora[0]?.id === bonusVend.id ? 1 : 0] ?? null,
+        data.bonusMarkupFora[bonusVend && data.bonusMarkupFora[0]?.id === bonusVend.id ? 2 : 1] ?? null,
+      ]
+      const cardsBonus = bonusList.map((v, i) => {
+        const posGeral = podiumMarkupSize + i + 1
         const label = i === 0
           ? `⭐ BÔNUS R$ ${Number(regras.bonusMk).toLocaleString('pt-BR')}`
-          : `${i + 4}º ELEGÍVEL`
-        return encCard(v, i, label,
+          : `${posGeral}º ELEGÍVEL`
+        return encCard(v ?? undefined, i, label,
           v ? `Mk ${Number(v.markup).toFixed(2)}%` : '—',
           i === 0 && v ? 'R$ ' + Number(regras.bonusMk).toLocaleString('pt-BR') : null,
           r2BaseUrl)
