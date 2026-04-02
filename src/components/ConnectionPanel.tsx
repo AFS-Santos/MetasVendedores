@@ -3,27 +3,44 @@ import { useDataStore } from '../stores/useDataStore'
 import { useToast } from '../hooks/useToast'
 
 const badgeStyles = {
-  local: 'bg-muted/20 text-muted2',
-  ok: 'bg-green2/15 text-green2',
-  err: 'bg-red2/15 text-red2',
+  local:   'bg-muted/20 text-muted2',
+  ok:      'bg-green2/15 text-green2',
+  err:     'bg-red2/15 text-red2',
   loading: 'bg-gold/15 text-gold',
 }
 
 const badgeLabels = {
-  local: '● LOCAL',
-  ok: '● SHEETS',
-  err: '● ERRO',
+  local:   '● LOCAL',
+  ok:      '● SHEETS',
+  err:     '● ERRO',
   loading: '◌ SYNC...',
 }
 
+function formatLastSync(ts: number): string {
+  if (!ts) return ''
+  const diff = Math.floor((Date.now() - ts) / 1000)
+  if (diff < 5)  return 'agora'
+  if (diff < 60) return `${diff}s atrás`
+  const min = Math.floor(diff / 60)
+  return `${min}min atrás`
+}
+
 export function ConnectionPanel() {
-  const sheetsUrl = useDataStore(s => s.sheetsUrl)
-  const setSheetsUrl = useDataStore(s => s.setSheetsUrl)
-  const syncStatus = useDataStore(s => s.syncStatus)
+  const sheetsUrl     = useDataStore(s => s.sheetsUrl)
+  const setSheetsUrl  = useDataStore(s => s.setSheetsUrl)
+  const syncStatus    = useDataStore(s => s.syncStatus)
   const syncFromSheets = useDataStore(s => s.syncFromSheets)
-  const syncError = useDataStore(s => s.syncError)
-  const toast = useToast(s => s.show)
+  const syncError     = useDataStore(s => s.syncError)
+  const lastSyncTime  = useDataStore(s => s.lastSyncTime)
+  const toast         = useToast(s => s.show)
   const [inputUrl, setInputUrl] = useState(sheetsUrl)
+
+  // Atualiza o "X atrás" a cada 10s
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 10_000)
+    return () => clearInterval(id)
+  }, [])
 
   const handleTest = async () => {
     const url = inputUrl.trim()
@@ -107,9 +124,16 @@ export function ConnectionPanel() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className={`text-xs px-2.5 py-1 rounded-full font-bold tracking-wide ${badgeStyles[syncStatus]}`}>
-              {badgeLabels[syncStatus]}
-            </span>
+            <div className="flex flex-col items-end">
+              <span className={`text-xs px-2.5 py-1 rounded-full font-bold tracking-wide ${badgeStyles[syncStatus]}`}>
+                {badgeLabels[syncStatus]}
+              </span>
+              {syncStatus === 'ok' && lastSyncTime > 0 && (
+                <span className="text-[0.58rem] text-muted2 mt-0.5">
+                  atualizado {formatLastSync(lastSyncTime)}
+                </span>
+              )}
+            </div>
             <button
               onClick={handleSync}
               disabled={syncStatus === 'loading'}

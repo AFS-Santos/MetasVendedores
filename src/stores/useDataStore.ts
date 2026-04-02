@@ -58,7 +58,9 @@ export const useDataStore = create<DataState>((set, get) => ({
   drivePhotos: loadFromStorage('mt_drive_fotos', {}),
   sheetsUrl: localStorage.getItem('mt_sheets') || '',
   campanhaEncerrada: loadFromStorage('mt_campanha_encerrada', false),
-  syncStatus: localStorage.getItem('mt_sheets') ? 'ok' : 'local',
+  // Se tem URL configurada, começa como loading — vai buscar dado real imediatamente
+  // Se não tem URL, começa como local — usuário ainda não configurou
+  syncStatus: localStorage.getItem('mt_sheets') ? 'loading' : 'local',
   lastSyncTime: 0,
   syncError: null,
 

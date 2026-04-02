@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type React from 'react'
 import { useDataStore } from '../stores/useDataStore'
 import { useFiltered } from '../hooks/useFiltered'
-import { fmt, pct, fmtPct, elegivelMarkup, barColor, sortVendedores, filterByRanking } from '../lib/formatters'
+import { fmt, pct, fmtPct, elegivelMarkup, barColor, prepareRankingData } from '../lib/formatters'
 import { Avatar } from './Avatar'
 import type { RankingType } from '../schemas/vendedor'
 import type { Vendedor, Regras } from '../schemas/vendedor'
@@ -12,34 +12,50 @@ interface RankingSectionProps {
   onEdit: (id: string) => void
 }
 
-// ── Podium Card ──
+// ── Estilos do pódio ──
 
 const POD_STYLES = [
-  { border: 'border-gold/40', gradFrom: '#181400', gradTo: '#100d00', text: 'text-gold', label: '1º', medal: '🥇', size: 56 },
-  { border: 'border-silver/30', gradFrom: '#121720', gradTo: '#0c1018', text: 'text-silver', label: '2º', medal: '🥈', size: 44 },
-  { border: 'border-bronze/30', gradFrom: '#180e05', gradTo: '#100803', text: 'text-bronze', label: '3º', medal: '🥉', size: 44 },
+  { border: 'border-gold/40',   gradFrom: '#181400', gradTo: '#100d00', text: 'text-gold',   medal: '🥇', size: 56 },
+  { border: 'border-silver/30', gradFrom: '#121720', gradTo: '#0c1018', text: 'text-silver', medal: '🥈', size: 44 },
+  { border: 'border-bronze/30', gradFrom: '#180e05', gradTo: '#100803', text: 'text-bronze', medal: '🥉', size: 44 },
 ]
 
+// ── Card do pódio ──
+
 function PodCard({ v, style, regras, allVendedores, rankingType }: {
-  v: Vendedor | undefined; style: typeof POD_STYLES[0]; regras: Regras; allVendedores: Vendedor[]; rankingType: RankingType
+  v: Vendedor | undefined
+  style: typeof POD_STYLES[0]
+  regras: Regras
+  allVendedores: Vendedor[]
+  rankingType: RankingType
 }) {
   if (!v) {
     return (
-      <div className={`rounded-xl border ${style.border} p-3 text-center flex flex-col items-center justify-center min-h-[100px]`}
-        style={{ background: `linear-gradient(160deg, ${style.gradFrom}, ${style.gradTo})` }}>
+      <div
+        className={`rounded-xl border ${style.border} p-3 text-center flex flex-col items-center justify-center min-h-[100px]`}
+        style={{ background: `linear-gradient(160deg, ${style.gradFrom}, ${style.gradTo})` }}
+      >
         <span className="text-xl">{style.medal}</span>
         <div className="text-muted text-xs italic mt-1">—</div>
       </div>
     )
   }
 
-  const p = pct(v.venda, v.meta)
+  const p      = pct(v.venda, v.meta)
   const origIdx = allVendedores.findIndex(x => x.id === v.id)
-  const value = rankingType === 'venda' ? fmt(v.venda) : rankingType === 'pct' ? fmtPct(p) : `Mk ${Number(v.markup || 0).toFixed(2)}%`
+  const isEleg  = elegivelMarkup(v, regras)
+
+  const value = rankingType === 'venda'
+    ? fmt(v.venda)
+    : rankingType === 'pct'
+    ? fmtPct(p)
+    : `Mk ${Number(v.markup || 0).toFixed(2)}%`
 
   return (
-    <div className={`rounded-xl border ${style.border} p-2.5 sm:p-3 text-center relative overflow-hidden hover:-translate-y-0.5 transition-all`}
-      style={{ background: `linear-gradient(160deg, ${style.gradFrom}, ${style.gradTo})` }}>
+    <div
+      className={`rounded-xl border ${style.border} p-2.5 sm:p-3 text-center relative overflow-hidden hover:-translate-y-0.5 transition-all`}
+      style={{ background: `linear-gradient(160deg, ${style.gradFrom}, ${style.gradTo})` }}
+    >
       <span className="text-xl block mb-1">{style.medal}</span>
       <div className="flex justify-center mb-1">
         <Avatar vendedor={v} size={style.size} idx={origIdx} />
@@ -48,30 +64,24 @@ function PodCard({ v, style, regras, allVendedores, rankingType }: {
       <div className="text-[0.55rem] text-muted2">{v.filial}</div>
       <div className={`font-display text-sm tracking-wide mt-0.5 ${style.text}`}>{value}</div>
       {rankingType === 'markup' && (
-        elegivelMarkup(v, regras)
+        isEleg
           ? <div className="text-[0.5rem] bg-green2/15 text-green2 rounded px-1 py-px mt-1 inline-block">✅</div>
-          : <div className="text-[0.5rem] bg-red2/10 text-red2 rounded px-1 py-px mt-1 inline-block">⛔</div>
+          : <div className="text-[0.5rem] bg-red2/10  text-red2  rounded px-1 py-px mt-1 inline-block">⛔</div>
       )}
     </div>
   )
 }
 
-// ── Inline Bonus (only for Markup tab) ──
+// ── Card de bônus markup ──
 
-function MarkupBonus({ vendedores, regras }: { vendedores: Vendedor[]; regras: Regras }) {
-  const elegiveis = vendedores.filter(v => elegivelMarkup(v, regras))
-  // Bônus: melhor markup entre TODOS os elegíveis (inclusive pódio)
-  const sortedByMk = sortVendedores(elegiveis, 'markup')
-  const bonusVend = sortedByMk.length > 0 ? sortedByMk[0] : null
-
-  if (!bonusVend) {
+function MarkupBonusCard({ vend, regras }: { vend: Vendedor | null; regras: Regras }) {
+  if (!vend) {
     return (
       <div className="mt-3 px-3 py-2 bg-gold/5 border border-gold/15 rounded-lg text-xs text-muted2">
         ⭐ Bônus Markup (R$ {Number(regras.bonusMk).toLocaleString('pt-BR')}): Sem elegíveis
       </div>
     )
   }
-
   return (
     <div className="mt-3 px-3 py-2 bg-gold/5 border border-gold/15 rounded-lg flex items-center gap-2.5 flex-wrap">
       <div className="text-xs">
@@ -79,81 +89,75 @@ function MarkupBonus({ vendedores, regras }: { vendedores: Vendedor[]; regras: R
         <span className="text-muted2 ml-1.5">Melhor markup entre elegíveis:</span>
       </div>
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        <span className="text-xs font-bold text-text">{bonusVend.nome}</span>
-        <span className="text-xs bg-green2/10 text-green2 rounded px-1.5 py-px font-bold">Mk {Number(bonusVend.markup).toFixed(2)}%</span>
+        <span className="text-xs font-bold text-text">{vend.nome}</span>
+        <span className="text-xs bg-green2/10 text-green2 rounded px-1.5 py-px font-bold">
+          Mk {Number(vend.markup).toFixed(2)}%
+        </span>
       </div>
     </div>
   )
 }
 
-// ── Main Component ──
+// ── Componente principal ──
 
 export function RankingSection({ type, onEdit }: RankingSectionProps) {
-  const allVendedores = useDataStore(s => s.vendedores)
-  const regras = useDataStore(s => s.regras)
+  const allVendedores    = useDataStore(s => s.vendedores)
+  const regras           = useDataStore(s => s.regras)
   const campanhaEncerrada = useDataStore(s => s.campanhaEncerrada)
-  const filtered = useFiltered()
+  const filtered         = useFiltered()
 
-  const displayList = useMemo(() => {
-    const afterFilter = filterByRanking(filtered, type, regras, campanhaEncerrada)
-    return sortVendedores(afterFilter, type)
-  }, [filtered, type, regras, campanhaEncerrada])
+  /**
+   * Único ponto de cálculo — tudo vem daqui.
+   * Muda o filtro de filial (filtered) ou o estado da campanha → recalcula tudo.
+   */
+  const ranking = useMemo(
+    () => prepareRankingData(filtered, regras, campanhaEncerrada),
+    [filtered, regras, campanhaEncerrada],
+  )
 
-  // Pódio markup:
-  //   Campanha ATIVA    → todos os vendedores (sem filtro de elegibilidade)
-  //   Campanha ENCERRADA → apenas elegíveis, ordenados por markup desc
-  // Pódio venda/pct: usa a displayList normal
-  const podiumList = useMemo(() => {
-    if (type === 'markup') {
-      if (campanhaEncerrada) {
-        const elegiveis = filtered.filter(v => elegivelMarkup(v, regras))
-        return sortVendedores(elegiveis, 'markup')
-      }
-      return sortVendedores(filtered, 'markup')
-    }
-    return displayList
-  }, [filtered, type, regras, campanhaEncerrada, displayList])
+  // Seleciona tabela e pódio corretos para a aba ativa
+  const tabela  = type === 'venda' ? ranking.tabelaVenda
+                : type === 'pct'   ? ranking.tabelaPct
+                :                    ranking.tabelaMarkup
 
-  const top3 = podiumList.slice(0, 3)
+  const podium  = type === 'venda' ? ranking.podiumVenda
+                : type === 'pct'   ? ranking.podiumPct
+                :                    ranking.podiumMarkup
 
-  // ID do vendedor que recebe o bônus de markup (melhor mk elegível fora do top 3)
-  const bonusVendId = useMemo(() => {
-    if (type !== 'markup') return null
-    const top3Ids = new Set(top3.map(v => v?.id))
-    const elegiveis = sortVendedores(
-      filtered.filter(v => elegivelMarkup(v, regras) && !top3Ids.has(v.id)),
-      'markup'
-    )
-    return elegiveis[0]?.id ?? null
-  }, [type, top3, filtered, regras])
+  // IDs do pódio — para marcar os badges 🏆 Top 3 na tabela
+  const podiumIds = new Set(podium.map(v => v?.id))
+
+  // ID do vencedor do bônus — para marcar o badge ⭐ na tabela
+  const bonusId = ranking.bonusMarkupVend?.id ?? null
 
   return (
     <div>
-      {/* Podium + Table grid */}
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
 
-        {/* Podium */}
+        {/* ── Pódio ── */}
         <div>
           <div className="grid grid-cols-3 gap-1.5 items-end">
             <div className="pt-3">
-              <PodCard v={top3[1]} style={POD_STYLES[1]!} regras={regras} allVendedores={allVendedores} rankingType={type} />
+              <PodCard v={podium[1]} style={POD_STYLES[1]!} regras={regras} allVendedores={allVendedores} rankingType={type} />
             </div>
             <div>
-              <PodCard v={top3[0]} style={POD_STYLES[0]!} regras={regras} allVendedores={allVendedores} rankingType={type} />
+              <PodCard v={podium[0]} style={POD_STYLES[0]!} regras={regras} allVendedores={allVendedores} rankingType={type} />
             </div>
             <div className="pt-5">
-              <PodCard v={top3[2]} style={POD_STYLES[2]!} regras={regras} allVendedores={allVendedores} rankingType={type} />
+              <PodCard v={podium[2]} style={POD_STYLES[2]!} regras={regras} allVendedores={allVendedores} rankingType={type} />
             </div>
           </div>
-          {/* Inline bonus for markup */}
-          {type === 'markup' && <MarkupBonus vendedores={filtered} regras={regras} />}
+
+          {type === 'markup' && (
+            <MarkupBonusCard vend={ranking.bonusMarkupVend} regras={regras} />
+          )}
         </div>
 
-        {/* Table */}
+        {/* ── Tabela ── */}
         <div className="overflow-x-auto">
-          {displayList.length === 0 ? (
+          {tabela.length === 0 ? (
             <div className="text-center py-8 text-muted2 text-sm italic">
-              {campanhaEncerrada ? 'Nenhum vendedor elegível' : 'Nenhum vendedor'}
+              Nenhum vendedor
             </div>
           ) : (
             <table className="w-full border-collapse min-w-[520px]">
@@ -168,62 +172,70 @@ export function RankingSection({ type, onEdit }: RankingSectionProps) {
                 </tr>
               </thead>
               <tbody>
-                {displayList.map((v, i) => {
-                  const p = pct(v.venda, v.meta)
-                  const mk = v.markup || 0
+                {tabela.map((v, i) => {
+                  const p       = pct(v.venda, v.meta)
+                  const mk      = v.markup || 0
                   const origIdx = allVendedores.findIndex(x => x.id === v.id)
-                  const bColor = barColor(p)
-                  const isEleg = elegivelMarkup(v, regras)
-                  const isPodium = top3.some(t => t?.id === v.id)
-                  const isBonusVend = bonusVendId === v.id
-                  const rowOpacity = type === 'markup' && !isEleg && !campanhaEncerrada ? 0.38 : 1
+                  const bColor  = barColor(p)
+                  const isEleg  = elegivelMarkup(v, regras)
+                  const isPodium  = podiumIds.has(v.id)
+                  const isBonus   = bonusId === v.id
+                  const opacity   = type === 'markup' && !isEleg && !campanhaEncerrada ? 0.38 : 1
 
                   // Badge abaixo do nome
                   let badge: React.ReactNode = null
-                  if (isPodium) {
-                    badge = (
-                      <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-gold/15 text-gold border border-gold/25 rounded px-1.5 py-px font-bold">
-                        🏆 Top 3
-                      </span>
-                    )
-                  } else if (isBonusVend) {
-                    badge = (
-                      <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-gold/10 text-gold border border-gold/20 rounded px-1.5 py-px font-bold">
-                        ⭐ Bônus R$ {Number(regras.bonusMk).toLocaleString('pt-BR')}
-                      </span>
-                    )
-                  } else if (isEleg) {
-                    badge = (
-                      <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-green2/10 text-green2 border border-green2/20 rounded px-1.5 py-px font-bold">
-                        ✅ Elegível
-                      </span>
-                    )
-                  } else if (type === 'markup' && !campanhaEncerrada) {
-                    badge = (
-                      <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-red2/10 text-red2 border border-red2/20 rounded px-1.5 py-px font-bold">
-                        ⛔ Inelegível
-                      </span>
-                    )
+                  if (type === 'markup') {
+                    if (isPodium) {
+                      badge = (
+                        <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-gold/15 text-gold border border-gold/25 rounded px-1.5 py-px font-bold">
+                          🏆 Top 3
+                        </span>
+                      )
+                    } else if (isBonus) {
+                      badge = (
+                        <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-gold/10 text-gold border border-gold/20 rounded px-1.5 py-px font-bold">
+                          ⭐ Bônus R$ {Number(regras.bonusMk).toLocaleString('pt-BR')}
+                        </span>
+                      )
+                    } else if (isEleg) {
+                      badge = (
+                        <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-green2/10 text-green2 border border-green2/20 rounded px-1.5 py-px font-bold">
+                          ✅ Elegível
+                        </span>
+                      )
+                    } else if (!campanhaEncerrada) {
+                      badge = (
+                        <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-red2/10 text-red2 border border-red2/20 rounded px-1.5 py-px font-bold">
+                          ⛔ Inelegível
+                        </span>
+                      )
+                    }
                   }
 
-                  // Markup badge color
-                  const mkBg = mk > regras.mkMin ? 'bg-green2/10 text-green2' : mk >= 20 ? 'bg-gold/10 text-gold' : 'bg-red2/10 text-red2'
+                  const mkBg = mk > regras.mkMin
+                    ? 'bg-green2/10 text-green2'
+                    : mk >= 20
+                    ? 'bg-gold/10 text-gold'
+                    : 'bg-red2/10 text-red2'
 
                   return (
                     <tr
                       key={v.id}
                       onClick={() => onEdit(v.id)}
-                      className="border-b border-border/40 hover:bg-surface2 cursor-pointer transition-colors animate-row-in group"
-                      style={{ animationDelay: `${i * 0.025}s`, opacity: rowOpacity }}
+                      className="border-b border-border/40 hover:bg-surface2 cursor-pointer transition-colors animate-row-in"
+                      style={{ animationDelay: `${i * 0.025}s`, opacity }}
                     >
                       {/* # */}
                       <td className="py-2 px-1 w-8">
                         <span className="font-display text-sm text-center block">
-                          {i < 3 ? ['🥇','🥈','🥉'][i] : <span className="text-muted text-xs">{i + 1}°</span>}
+                          {i < 3
+                            ? (['🥇', '🥈', '🥉'] as const)[i]
+                            : <span className="text-muted text-xs">{i + 1}°</span>
+                          }
                         </span>
                       </td>
 
-                      {/* Vendedor */}
+                      {/* Vendedor + badge */}
                       <td className="py-2 px-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <Avatar vendedor={v} size={28} idx={origIdx} />
@@ -237,7 +249,9 @@ export function RankingSection({ type, onEdit }: RankingSectionProps) {
 
                       {/* Filial */}
                       <td className="py-2 px-2 hidden md:table-cell">
-                        <span className="text-[0.65rem] px-2 py-0.5 rounded bg-surface3 text-muted2 whitespace-nowrap">{v.filial}</span>
+                        <span className="text-[0.65rem] px-2 py-0.5 rounded bg-surface3 text-muted2 whitespace-nowrap">
+                          {v.filial}
+                        </span>
                       </td>
 
                       {/* Progresso */}

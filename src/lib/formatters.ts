@@ -17,10 +17,12 @@ export {
   mkBadgeClass,
   sortVendedores,
   filterByRanking,
+  prepareRankingData,
   uid,
 } from '@shared/utils'
 
 export type { SortMode } from '@shared/types'
+export type { RankingData } from '@shared/utils'
 
 /**
  * Classe de cor do avatar baseada no index (específico do frontend — usa Tailwind).
