@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ⚡ DENSUL MT/MS — Dashboard de Vendas
 
 Dashboard de metas e bonificações dos vendedores DENSUL MT/MS.
@@ -150,3 +151,6 @@ src/
 | Zustand | State management |
 | Zod | Validação de dados |
 | html2canvas | Exportação PNG |
+=======
+# MetasVendedores
+>>>>>>> 1e96a29cf91bcb0f1b508c103484b28b5639b299
