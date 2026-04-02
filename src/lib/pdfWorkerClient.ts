@@ -20,6 +20,7 @@ interface ExportRequest {
   regras: Regras
   sortMode: SortMode
   filial?: string
+  campanhaEncerrada?: boolean
 }
 
 /**

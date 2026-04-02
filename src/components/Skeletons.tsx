@@ -42,27 +42,3 @@ export function RankingSkeleton() {
     </div>
   )
 }
-
-/** Podium skeleton */
-export function PodiumSkeleton() {
-  return (
-    <div className="bg-surface border border-border rounded-xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-border">
-        <Skeleton className="h-4 w-32" />
-      </div>
-      <div className="p-4">
-        <div className="grid grid-cols-3 gap-3 items-end">
-          {[170, 200, 155].map((h, i) => (
-            <div key={i} className="rounded-xl border border-border p-4" style={{ minHeight: h }}>
-              <div className="flex flex-col items-center gap-2">
-                <Skeleton className="w-10 h-10 rounded-full" />
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-5 w-24" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}

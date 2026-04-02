@@ -51,12 +51,15 @@ export const sortVendedores = (arr: Vendedor[], mode: SortMode): Vendedor[] => {
 }
 
 /**
- * Filtra vendedores conforme tipo de ranking e estado da campanha.
+ * Filtra e ordena vendedores conforme tipo de ranking e estado da campanha.
  *
- * Campanha ATIVA: mostra todos
+ * Campanha ATIVA: retorna todos, sem ordenação forçada
  * Campanha ENCERRADA:
  *  - venda/pct: esconde venda = 0
- *  - markup: só elegíveis (mkMin > 51% E meta >= 85%)
+ *  - markup: retorna TODOS, mas ordenados por elegibilidade:
+ *      1º elegíveis (mk > mkMin E meta >= metaMin) por markup desc
+ *      2º inelegíveis por markup desc
+ *    (a tabela exibe todos; o pódio usa apenas os top 3 elegíveis)
  */
 export function filterByRanking(
   vendedores: Vendedor[],
@@ -69,8 +72,17 @@ export function filterByRanking(
     case 'venda':
     case 'pct':
       return vendedores.filter(v => (v.venda || 0) > 0)
-    case 'markup':
-      return vendedores.filter(v => elegivelMarkup(v, regras))
+    case 'markup': {
+      const elegiveis = sortVendedores(
+        vendedores.filter(v => elegivelMarkup(v, regras)),
+        'markup',
+      )
+      const inelegiveis = sortVendedores(
+        vendedores.filter(v => !elegivelMarkup(v, regras)),
+        'markup',
+      )
+      return [...elegiveis, ...inelegiveis]
+    }
   }
 }
 

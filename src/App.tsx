@@ -55,6 +55,7 @@ export default function App() {
         onPdfRanking={() => openPdf('ranking')}
         onPdfPodio={() => openPdf('podio')}
         onPdfFilial={() => openPdf('filial-select')}
+        onPdfEncerramento={() => openPdf('encerramento')}
       />
 
       <ErrorBoundary section="Conexão">

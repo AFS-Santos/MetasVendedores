@@ -7,7 +7,7 @@ import { ini } from '../lib/formatters'
 import type { SortMode } from '../lib/formatters'
 import type { PdfRequest } from '@shared/pdfTemplates'
 
-export type PdfMode = 'ranking' | 'podio' | 'filial-select' | 'filial' | 'todas' | null
+export type PdfMode = 'ranking' | 'podio' | 'filial-select' | 'filial' | 'todas' | 'encerramento' | null
 
 interface PdfExportProps {
   open: boolean
@@ -18,6 +18,7 @@ interface PdfExportProps {
 export function PdfExport({ open, onClose, initialMode }: PdfExportProps) {
   const vendedores = useDataStore(s => s.vendedores)
   const regras = useDataStore(s => s.regras)
+  const campanhaEncerrada = useDataStore(s => s.campanhaEncerrada)
   const toast = useToast(s => s.show)
 
   const [pdfSort, setPdfSort] = useState<SortMode>('pct')
@@ -40,7 +41,7 @@ export function PdfExport({ open, onClose, initialMode }: PdfExportProps) {
   // Resolve current export type for worker calls
   const exportType = mode === 'filial-select' ? null
     : mode === 'filial' ? 'filial' as const
-    : mode as 'ranking' | 'podio' | 'todas' | null
+    : mode as 'ranking' | 'podio' | 'todas' | 'encerramento' | null
 
   // Build request for both preview and Worker export
   const pdfReq: PdfRequest = {
@@ -50,6 +51,7 @@ export function PdfExport({ open, onClose, initialMode }: PdfExportProps) {
     sortMode: pdfSort,
     filial: selectedFilial || undefined,
     r2BaseUrl: import.meta.env.VITE_R2_PUBLIC_URL?.replace(/\/$/, '') || '',
+    campanhaEncerrada,
   }
 
   // Generate HTML for local preview
@@ -67,6 +69,9 @@ export function PdfExport({ open, onClose, initialMode }: PdfExportProps) {
   } else if (mode === 'todas') {
     htmlContent = generatePdfHtml({ ...pdfReq, type: 'todas' })
     title = '🌐 PDF TODAS AS FILIAIS'
+  } else if (mode === 'encerramento') {
+    htmlContent = generatePdfHtml({ ...pdfReq, type: 'encerramento' })
+    title = '🏆 ENCERRAMENTO DA CAMPANHA'
   } else if (mode === 'filial-select') {
     title = '🏢 SELECIONAR FILIAL'
   }
@@ -82,6 +87,7 @@ export function PdfExport({ open, onClose, initialMode }: PdfExportProps) {
         regras,
         sortMode: pdfSort,
         filial: selectedFilial || undefined,
+        campanhaEncerrada,
       }
       if (format === 'pdf') {
         await exportPdf(request)
@@ -193,18 +199,20 @@ export function PdfExport({ open, onClose, initialMode }: PdfExportProps) {
           <div className="flex gap-2 items-center flex-wrap">
             {mode !== 'filial-select' && (
               <>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[0.68rem] text-muted2 whitespace-nowrap">Ordenar por:</span>
-                  <select
-                    value={pdfSort}
-                    onChange={e => setPdfSort(e.target.value as SortMode)}
-                    className="bg-surface3 text-text border border-border rounded-md px-2.5 py-1 text-xs font-body cursor-pointer outline-none"
-                  >
-                    <option value="pct">% da Meta</option>
-                    <option value="venda">Valor Vendido</option>
-                    <option value="markup">Markup</option>
-                  </select>
-                </div>
+                {mode !== 'encerramento' && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[0.68rem] text-muted2 whitespace-nowrap">Ordenar por:</span>
+                    <select
+                      value={pdfSort}
+                      onChange={e => setPdfSort(e.target.value as SortMode)}
+                      className="bg-surface3 text-text border border-border rounded-md px-2.5 py-1 text-xs font-body cursor-pointer outline-none"
+                    >
+                      <option value="pct">% da Meta</option>
+                      <option value="venda">Valor Vendido</option>
+                      <option value="markup">Markup</option>
+                    </select>
+                  </div>
+                )}
                 <button
                   onClick={handlePdf}
                   disabled={exporting}

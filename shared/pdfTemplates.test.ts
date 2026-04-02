@@ -99,4 +99,30 @@ describe('generatePdfHtml', () => {
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('DENSUL')
   })
+
+  it('campanha ativa: podio inclui todos os vendedores', () => {
+    const html = generatePdfHtml({ ...baseReq, type: 'podio', sortMode: 'markup', campanhaEncerrada: false })
+    // Todos devem aparecer no pódio (sem filtro de elegibilidade)
+    expect(html).toContain('MARCIO LARA')
+    expect(html).toContain('ALDEMIR ALVES')
+  })
+
+  it('campanha encerrada: podio exibe apenas elegíveis', () => {
+    // ALDEMIR: mk 51.75 > 51, pct 67.7% < 85% → inelegível
+    // JEAN: mk 52.31 > 51, pct 59.2% < 85% → inelegível
+    // MARCIO: mk 53.88 > 51, pct 100%+ >= 85% → elegível
+    const html = generatePdfHtml({ ...baseReq, type: 'podio', sortMode: 'markup', campanhaEncerrada: true })
+    expect(html).toContain('MARCIO LARA')
+    // Inelegíveis não devem aparecer no pódio (mas aparecem na tabela abaixo)
+    const podioSection = html.split('RANKING COMPLETO')[0] ?? html
+    expect(podioSection).not.toContain('JEAN RIOS')
+  })
+
+  it('campanha encerrada: tabela mostra todos com elegíveis primeiro', () => {
+    const html = generatePdfHtml({ ...baseReq, type: 'ranking', sortMode: 'markup', campanhaEncerrada: true })
+    // MARCIO (elegível) deve aparecer antes de JEAN e ALDEMIR (inelegíveis)
+    const marcioPos = html.indexOf('MARCIO LARA')
+    const jeanPos = html.indexOf('JEAN RIOS')
+    expect(marcioPos).toBeLessThan(jeanPos)
+  })
 })

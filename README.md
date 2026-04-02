@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # ⚡ DENSUL MT/MS — Dashboard de Vendas
 
 Dashboard de metas e bonificações dos vendedores DENSUL MT/MS.
@@ -13,10 +12,10 @@ React + TypeScript + Vite + Tailwind + Zustand + Zod
 ## Instalação
 
 ```bash
-git clone https://github.com/SEU-USUARIO/meta-vendedores.git
-cd meta-vendedores
+git clone https://github.com/AFS-Santos/MetasVendedores.git
+cd MetasVendedores
 npm install
-cp .env.example .env   # opcional: configure R2
+cp .env.example .env   # opcional: configure R2 e PDF Worker
 npm run dev
 ```
 
@@ -76,12 +75,20 @@ VITE_R2_PUBLIC_URL=https://fotos.seu-dominio.com
 
 Se `VITE_R2_PUBLIC_URL` não estiver configurado, usa apenas Drive.
 
+## Exportação PDF/PNG — Worker (opcional)
+
+Por padrão o export usa `html2canvas` local (fallback). Para exports com melhor qualidade via Puppeteer server-side, configure o Worker:
+
+```bash
+# .env (local)
+VITE_PDF_WORKER_URL=https://meta-vendedores-pdf.SEU-SUBDOMAIN.workers.dev
+```
+
 ## Funcionalidades
 
 - **KPIs**: total vendido, meta geral, filiais ativas, vendedores, markup médio
 - **Pódio**: top 3 com badges de elegibilidade e prêmios
 - **Ranking**: tabela completa com barras de progresso e status
-- **Bonificações**: cards top 3 + bônus markup + melhor filial
 - **Gráfico**: desempenho por filial (markup médio ou % meta)
 - **Filtro por filial**: tabs dinâmicos
 - **Edição em massa**: edita meta/venda/markup de todos de uma vez
@@ -89,7 +96,7 @@ Se `VITE_R2_PUBLIC_URL` não estiver configurado, usa apenas Drive.
 - **Auto-sync**: 60s polling + sync ao voltar na aba
 - **PDF export**: ranking geral, pódio, por filial, todas as filiais
 - **PNG export**: imagem para compartilhar no WhatsApp
-- **Ordenação**: por markup, % meta, ou valor vendido (em todos os lugares)
+- **Campanha ativa/encerrada**: altera filtros de elegibilidade do pódio e das exportações
 
 ## Deploy — Cloudflare Pages
 
@@ -99,7 +106,7 @@ Se `VITE_R2_PUBLIC_URL` não estiver configurado, usa apenas Drive.
 4. Configure:
    - **Build command**: `npm run build`
    - **Build output**: `dist`
-   - **Environment variable**: `VITE_R2_PUBLIC_URL` (se usar R2)
+   - **Environment variables**: `VITE_R2_PUBLIC_URL` (se usar R2), `VITE_PDF_WORKER_URL` (se usar worker)
 5. Deploy
 
 ## Estrutura do projeto
@@ -110,34 +117,45 @@ src/
 ├── App.tsx                     # Layout principal + modais
 ├── components/
 │   ├── Avatar.tsx              # Avatar com foto R2/Drive/iniciais
-│   ├── BonusSection.tsx        # Bonificações & elegibilidade
 │   ├── ConnectionPanel.tsx     # Painel de conexão Sheets
+│   ├── ErrorBoundary.tsx       # Error boundary por seção
 │   ├── FilialChart.tsx         # Gráfico barras por filial
 │   ├── FilialTabs.tsx          # Tabs de filtro por filial
-│   ├── Header.tsx              # Header com botões
-│   ├── KPIRow.tsx              # Cards de KPI
+│   ├── Header.tsx              # Header com botões e toggle campanha
+│   ├── KPIRow.tsx              # Cards de KPI animados
 │   ├── MassEditModal.tsx       # Edição em massa
 │   ├── Modal.tsx               # Wrapper de modal
 │   ├── PdfExport.tsx           # Overlay de exportação PDF/PNG
-│   ├── Podium.tsx              # Pódio top 3
-│   ├── RankingTable.tsx        # Tabela de ranking
+│   ├── RankingSection.tsx      # Pódio + tabela de ranking
 │   ├── RegrasModal.tsx         # Modal de regras da campanha
+│   ├── Skeletons.tsx           # Skeletons de loading
 │   ├── Toast.tsx               # Notificações
 │   └── VendedorModal.tsx       # Adicionar/editar vendedor
 ├── hooks/
 │   ├── useAutoSync.ts          # Polling + visibility sync
+│   ├── useFiltered.ts          # Vendedores filtrados pela filial ativa
 │   └── useToast.ts             # Store de notificações
 ├── lib/
-│   ├── formatters.ts           # fmt(), pct(), ini(), sorting
-│   ├── pdfGenerator.ts         # Geração de HTML para PDFs
+│   ├── formatters.ts           # Re-exports de shared/utils + avatarColorClass
+│   ├── pdfWorkerClient.ts      # Cliente para o Worker de PDF/PNG
 │   ├── r2Photos.ts             # Resolução de fotos R2 + Drive
 │   └── sheetsApi.ts            # JSONP fetch/push Apps Script
 ├── schemas/
-│   └── vendedor.ts             # Zod schemas + tipos
+│   └── vendedor.ts             # Zod schemas + re-exports de shared/types
 ├── stores/
-│   └── useAppStore.ts          # Zustand store global
+│   ├── useDataStore.ts         # Zustand store — dados e sync
+│   └── useUIStore.ts           # Zustand store — estado de UI
 └── styles/
     └── globals.css             # Tailwind + animações
+
+shared/                         # Código compartilhado frontend ↔ worker
+├── types.ts                    # Tipos: Vendedor, Regras, RankingType, SortMode
+├── utils.ts                    # Funções puras: fmt, pct, elegivel, sort, filter
+├── pdfTemplates.ts             # Geração de HTML para PDF/PNG
+└── pdfTemplates.test.ts        # Testes dos templates
+
+worker/                         # Cloudflare Worker — PDF/PNG server-side
+└── src/index.ts                # Puppeteer + Browser Rendering API
 ```
 
 ## Stack
@@ -150,7 +168,5 @@ src/
 | Tailwind CSS 3 | Styling |
 | Zustand | State management |
 | Zod | Validação de dados |
-| html2canvas | Exportação PNG |
-=======
-# MetasVendedores
->>>>>>> 1e96a29cf91bcb0f1b508c103484b28b5639b299
+| html2canvas | Exportação PNG (fallback local) |
+| Cloudflare Worker + Puppeteer | Exportação PDF/PNG server-side (opcional) |

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fmt, pct, fmtPct, ini, elegivel, elegivelMarkup, filterByRanking, barColor, mkBadgeClass, sortVendedores, uid } from './formatters'
+import { fmt, pct, fmtPct, ini, elegivel, filterByRanking, barColor, mkBadgeClass, sortVendedores, uid } from './formatters'
 import type { Vendedor, Regras } from '../schemas/vendedor'
 
 // ── fmt() ──
@@ -235,12 +235,14 @@ describe('filterByRanking', () => {
     expect(result).toHaveLength(2)
   })
 
-  it('campanha encerrada: markup only shows eligible (mk > 51 AND meta >= 85%)', () => {
+  it('campanha encerrada: markup retorna todos, elegíveis primeiro ordenados por markup desc', () => {
     const result = filterByRanking(vendedores, 'markup', regras, true)
-    // Only HAS_SALES: mk 55 > 51, pct 90% >= 85%
-    // ZERO_SALES: mk 0, pct 0% → out
-    // LOW_META: mk 55 > 51, but pct 50% < 85% → out
-    expect(result).toHaveLength(1)
+    // Retorna todos os 3, mas elegíveis na frente
+    expect(result).toHaveLength(3)
+    // HAS_SALES é o único elegível (mk 55 > 51, pct 90% >= 85%) → deve vir primeiro
     expect(result[0]!.nome).toBe('HAS_SALES')
+    // Os demais (inelegíveis) vêm depois
+    const nomes = result.map(v => v.nome)
+    expect(nomes).not.toContain(undefined)
   })
 })

@@ -19,11 +19,11 @@ function jsonp<T>(url: string, timeout = 15000): Promise<T> {
 
     function cleanup() {
       clearTimeout(timer)
-      delete (window as Record<string, unknown>)[cb]
+      delete (window as unknown as Record<string, unknown>)[cb]
       el.remove()
     }
 
-    ;(window as Record<string, unknown>)[cb] = (data: T) => {
+    ;(window as unknown as Record<string, unknown>)[cb] = (data: T) => {
       cleanup()
       resolve(data)
     }

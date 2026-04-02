@@ -12,12 +12,13 @@ import type { Vendedor, Regras, SortMode } from './types'
 import { fmt, pct, fmtPct, ini, elegivel, sortVendedores } from './utils'
 
 export interface PdfRequest {
-  type: 'ranking' | 'podio' | 'filial' | 'todas'
+  type: 'ranking' | 'podio' | 'filial' | 'todas' | 'encerramento'
   vendedores: Vendedor[]
   regras: Regras
   sortMode: SortMode
   filial?: string
   r2BaseUrl: string
+  campanhaEncerrada?: boolean
 }
 
 function fotoUrl(v: Vendedor, r2Base: string): string | null {
@@ -101,8 +102,18 @@ function secTitle(txt: string) {
   return `<div style="background:#13161d;color:#fff;padding:8px 14px;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:2px;margin-bottom:14px">${txt}</div>`
 }
 
-function tabela(lista: Vendedor[], sortMode: string, regras: Regras, r2Base: string, mostrarFilial: boolean) {
-  const s = sortVendedores(lista, sortMode)
+function tabela(lista: Vendedor[], sortMode: SortMode, regras: Regras, r2Base: string, mostrarFilial: boolean, campanhaEncerrada: boolean) {
+  // Markup encerrado: elegíveis (mk desc) → inelegíveis (mk desc)
+  // Demais casos: ordenação normal pelo sortMode
+  let sorted: Vendedor[]
+  if (sortMode === 'markup' && campanhaEncerrada) {
+    const elegiveis = sortVendedores(lista.filter(v => elegivel(v, regras)), 'markup')
+    const inelegiveis = sortVendedores(lista.filter(v => !elegivel(v, regras)), 'markup')
+    sorted = [...elegiveis, ...inelegiveis]
+  } else {
+    sorted = sortVendedores(lista, sortMode)
+  }
+  const s = sorted
   const MEDALS = ['🥇', '🥈', '🥉']
   const th = 'padding:7px 8px;text-align:left;font-size:0.62rem;letter-spacing:1px;text-transform:uppercase;color:#fff;background:#13161d'
 
@@ -139,8 +150,12 @@ function tabela(lista: Vendedor[], sortMode: string, regras: Regras, r2Base: str
   </table>`
 }
 
-function podio3(lista: Vendedor[], sortMode: string, regras: Regras, r2Base: string) {
-  const s = sortVendedores(lista, sortMode)
+function podio3(lista: Vendedor[], sortMode: SortMode, regras: Regras, r2Base: string, campanhaEncerrada: boolean) {
+  // Campanha ATIVA    → pódio com todos, ordenados pelo sortMode
+  // Campanha ENCERRADA → pódio só com elegíveis, ordenados por markup desc
+  const podiumSource = campanhaEncerrada
+    ? sortVendedores(lista.filter(v => elegivel(v, regras)), 'markup')
+    : sortVendedores(lista, sortMode)
   const cfg = [
     { pos: 0, medal: '🥇', label: '1º LUGAR', premio: 'R$ ' + Number(regras.premios[0]).toLocaleString('pt-BR'), bg: 'linear-gradient(160deg,#fffbea,#fff3b0)', brd: '#f5c842', cor: '#c8860a', avBg: '#fffbea', avCor: '#c8860a' },
     { pos: 1, medal: '🥈', label: '2º LUGAR', premio: 'R$ ' + Number(regras.premios[1]).toLocaleString('pt-BR'), bg: 'linear-gradient(160deg,#f0f2f5,#e4e9f0)', brd: '#c0c8d8', cor: '#4a5568', avBg: '#f0f2f5', avCor: '#4a5568' },
@@ -149,7 +164,7 @@ function podio3(lista: Vendedor[], sortMode: string, regras: Regras, r2Base: str
   const heights = ['220px', '190px', '170px']
 
   const pods = cfg.map((c, ci) => {
-    const v = s[c.pos]
+    const v = podiumSource[c.pos]
     if (!v) {
       return `<div style="background:${c.bg};border:2px solid ${c.brd};border-radius:12px;padding:18px 12px;text-align:center;min-height:${heights[ci]};display:flex;flex-direction:column;align-items:center;justify-content:center">
         <div style="font-size:2rem">${c.medal}</div>
@@ -207,7 +222,7 @@ function wrapHtml(body: string): string {
 // ═══════════════════════════════════════════════════
 
 export function generatePdfHtml(req: PdfRequest): string {
-  const { vendedores, regras, sortMode, r2BaseUrl } = req
+  const { vendedores, regras, sortMode, r2BaseUrl, campanhaEncerrada = false } = req
   const sortLabels: Record<string, { header: string; sec: string }> = {
     pct: { header: 'por % Meta', sec: '% DA META' },
     venda: { header: 'por Valor Vendido', sec: 'VALOR VENDIDO' },
@@ -223,7 +238,7 @@ export function generatePdfHtml(req: PdfRequest): string {
         ${headerSection('Ranking Geral — ' + lbl.header)}
         ${kpiBar(vendedores)}
         ${secTitle('📊 RANKING POR ' + lbl.sec + ' — ' + vendedores.length + ' VENDEDORES')}
-        ${tabela(vendedores, sortMode, regras, r2BaseUrl, true)}
+        ${tabela(vendedores, sortMode, regras, r2BaseUrl, true, campanhaEncerrada)}
       </div>`
       break
 
@@ -232,9 +247,9 @@ export function generatePdfHtml(req: PdfRequest): string {
         ${headerSection('Pódio Geral — Top 3 ' + lbl.header)}
         ${kpiBar(vendedores)}
         ${secTitle('🏆 PÓDIO — TOP 3 POR ' + lbl.sec)}
-        ${podio3(vendedores, sortMode, regras, r2BaseUrl)}
+        ${podio3(vendedores, sortMode, regras, r2BaseUrl, campanhaEncerrada)}
         ${vendedores.length > 3
-          ? secTitle('📊 RANKING COMPLETO') + tabela(vendedores, sortMode, regras, r2BaseUrl, true)
+          ? secTitle('📊 RANKING COMPLETO') + tabela(vendedores, sortMode, regras, r2BaseUrl, true, campanhaEncerrada)
           : ''}
       </div>`
       break
@@ -246,9 +261,9 @@ export function generatePdfHtml(req: PdfRequest): string {
         ${headerSection('Ranking por Filial', f)}
         ${kpiBar(grupo)}
         ${secTitle('🏆 PÓDIO — ' + f + ' · TOP 3 POR ' + lbl.sec)}
-        ${podio3(grupo, sortMode, regras, r2BaseUrl)}
+        ${podio3(grupo, sortMode, regras, r2BaseUrl, campanhaEncerrada)}
         ${secTitle('📊 RANKING — ' + f + ' (' + grupo.length + ' vendedores)')}
-        ${tabela(grupo, sortMode, regras, r2BaseUrl, false)}
+        ${tabela(grupo, sortMode, regras, r2BaseUrl, false, campanhaEncerrada)}
       </div>`
       break
     }
@@ -261,14 +276,142 @@ export function generatePdfHtml(req: PdfRequest): string {
           ${headerSection('Ranking por Filial', f)}
           ${kpiBar(grupo)}
           ${secTitle('🏆 PÓDIO — ' + f + ' · TOP 3 POR ' + lbl.sec)}
-          ${podio3(grupo, sortMode, regras, r2BaseUrl)}
+          ${podio3(grupo, sortMode, regras, r2BaseUrl, campanhaEncerrada)}
           ${secTitle('📊 RANKING — ' + f)}
-          ${tabela(grupo, sortMode, regras, r2BaseUrl, false)}
+          ${tabela(grupo, sortMode, regras, r2BaseUrl, false, campanhaEncerrada)}
         </div>`
       }).join('')
+      break
+    }
+
+    case 'encerramento': {
+      body = generateEncerramentoBody(vendedores, regras, r2BaseUrl)
       break
     }
   }
 
   return wrapHtml(body)
+}
+
+// ═══════════════════════════════════════════════════
+//  ENCERRAMENTO — PDF dos Ganhadores
+// ═══════════════════════════════════════════════════
+
+function podioEncCard(v: Vendedor | undefined, pos: number, label: string, valueLine: string, premio: string | null, r2Base: string): string {
+  const medals = ['🥇', '🥈', '🥉']
+  const medal = medals[pos] ?? '🏅'
+
+  const gradients = [
+    { bg: 'linear-gradient(160deg,#fffbea,#fff3b0)', brd: '#f5c842', cor: '#c8860a', avBg: '#fffbea', avCor: '#c8860a' },
+    { bg: 'linear-gradient(160deg,#f0f2f5,#e4e9f0)', brd: '#c0c8d8', cor: '#4a5568', avBg: '#f0f2f5', avCor: '#4a5568' },
+    { bg: 'linear-gradient(160deg,#fdf3e8,#fae5c8)', brd: '#cd7f32', cor: '#8b5e1a', avBg: '#fdf3e8', avCor: '#8b5e1a' },
+  ]
+  const g = gradients[pos] ?? gradients[2]!
+
+  if (!v) {
+    return `<div style="background:${g.bg};border:2px solid ${g.brd};border-radius:12px;padding:14px 10px;text-align:center;flex:1">
+      <div style="font-size:1.6rem">${medal}</div>
+      <div style="font-size:0.6rem;font-weight:800;letter-spacing:2px;color:${g.cor};margin-top:4px">${label}</div>
+      <div style="color:#bbb;margin-top:8px;font-size:0.75rem">—</div>
+    </div>`
+  }
+
+  const url = fotoUrl(v, r2Base)
+  const avHtml = url
+    ? `<div style="width:52px;height:52px;border-radius:50%;overflow:hidden;margin:0 auto 6px;border:2px solid ${g.brd}"><img src="${url}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.display='none'"></div>`
+    : `<div style="width:52px;height:52px;border-radius:50%;background:${g.avBg};color:${g.avCor};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;margin:0 auto 6px;border:2px solid ${g.brd}">${ini(v.nome)}</div>`
+
+  return `<div style="background:${g.bg};border:2px solid ${g.brd};border-radius:12px;padding:14px 10px;text-align:center;flex:1">
+    <div style="font-size:1.6rem;margin-bottom:4px">${medal}</div>
+    ${avHtml}
+    <div style="font-size:0.6rem;font-weight:800;letter-spacing:2px;color:${g.cor};margin-bottom:3px">${label}</div>
+    <div style="font-weight:700;font-size:0.8rem;color:#1c1f26;margin-bottom:2px;line-height:1.2">${v.nome}</div>
+    <div style="font-size:0.72rem;font-weight:700;color:${g.cor};margin-bottom:${premio ? '8px' : '0'}">${valueLine}</div>
+    ${premio ? `<div style="display:inline-block;background:#fefce8;color:${g.cor};border:1px solid ${g.brd};border-radius:20px;padding:2px 10px;font-weight:700;font-size:0.7rem">🏆 ${premio}</div>` : ''}
+  </div>`
+}
+
+function encSection(icon: string, titulo: string, cards: string): string {
+  return `<div style="margin-bottom:18px">
+    <div style="background:#13161d;color:#f5c842;padding:7px 14px;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.95rem;letter-spacing:2.5px;margin-bottom:10px">
+      ${icon} ${titulo}
+    </div>
+    <div style="display:flex;gap:10px;align-items:stretch">${cards}</div>
+  </div>`
+}
+
+function generateEncerramentoBody(vendedores: Vendedor[], regras: Regras, r2Base: string): string {
+  const elegiveis = vendedores.filter(v => elegivel(v, regras))
+
+  // Os 3 rankings usam apenas elegíveis
+  const byMarkup = sortVendedores(elegiveis, 'markup')
+  const byVenda  = sortVendedores(elegiveis, 'venda')
+  const byPct    = sortVendedores(elegiveis, 'pct')
+
+  // Bônus: elegíveis fora do top 3 de markup, ordenados por markup desc
+  const top3MarkupIds = new Set(byMarkup.slice(0, 3).map(v => v.id))
+  const bonusCandidatos = byMarkup.filter(v => !top3MarkupIds.has(v.id))
+
+  const dataStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+
+  // ── Seção Markup ──
+  const cardsMarkup = [0, 1, 2].map(i =>
+    podioEncCard(byMarkup[i], i, `${i + 1}º LUGAR`,
+      `Mk ${Number(byMarkup[i]?.markup || 0).toFixed(2)}%`,
+      i < regras.premios.length ? 'R$ ' + Number(regras.premios[i]).toLocaleString('pt-BR') : null,
+      r2Base)
+  ).join('')
+
+  // ── Seção Valor Vendido ──
+  const cardsVenda = [0, 1, 2].map(i =>
+    podioEncCard(byVenda[i], i, `${i + 1}º LUGAR`,
+      fmt(byVenda[i]?.venda ?? 0),
+      null, r2Base)
+  ).join('')
+
+  // ── Seção % da Meta ──
+  const cardsPct = [0, 1, 2].map(i => {
+    const v = byPct[i]
+    const p = v ? pct(v.venda, v.meta) : 0
+    return podioEncCard(v, i, `${i + 1}º LUGAR`, fmtPct(p), null, r2Base)
+  }).join('')
+
+  // ── Seção Bônus Markup (4º, 5º, 6º elegíveis) ──
+  const cardsBonus = [0, 1, 2].map(i => {
+    const v = bonusCandidatos[i]
+    const mk = v?.markup ?? 0
+    const label = i === 0
+      ? `⭐ BÔNUS R$ ${Number(regras.bonusMk).toLocaleString('pt-BR')}`
+      : `${i + 4}º ELEGÍVEL`
+    return podioEncCard(v, i, label,
+      v ? `Mk ${Number(mk).toFixed(2)}%` : '—',
+      i === 0 && v ? 'R$ ' + Number(regras.bonusMk).toLocaleString('pt-BR') : null,
+      r2Base)
+  }).join('')
+
+  const totalEleg = elegiveis.length
+  const totalVend = vendedores.length
+
+  return `<div class="pdf-page" style="max-width:620px;margin:0 auto">
+    <!-- Header -->
+    <div style="border-bottom:3px solid #f5c842;padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-end">
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;color:#13161d;line-height:1">
+          ⚡ <span style="color:#e0a800">DENSUL</span> MT/MS
+        </div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;color:#555;margin-top:2px">
+          ENCERRAMENTO DA CAMPANHA
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:0.65rem;color:#888">${dataStr}</div>
+        <div style="font-size:0.65rem;color:#888;margin-top:2px">${totalEleg} elegíveis de ${totalVend} vendedores</div>
+      </div>
+    </div>
+
+    ${encSection('🎯', 'PÓDIO — MARKUP', cardsMarkup)}
+    ${encSection('💰', 'PÓDIO — VALOR VENDIDO', cardsVenda)}
+    ${encSection('📊', 'PÓDIO — % DA META', cardsPct)}
+    ${encSection('⭐', 'BÔNUS MARKUP', cardsBonus)}
+  </div>`
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDataStore } from '../stores/useDataStore'
-import { fmt, pct } from '../lib/formatters'
+import { pct } from '../lib/formatters'
 
 /** Animated number counter */
 function AnimatedValue({ value, prefix = '', suffix = '' }: { value: number; prefix?: string; suffix?: string }) {

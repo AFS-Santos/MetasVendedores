@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type React from 'react'
 import { useDataStore } from '../stores/useDataStore'
 import { useFiltered } from '../hooks/useFiltered'
 import { fmt, pct, fmtPct, elegivelMarkup, barColor, sortVendedores, filterByRanking } from '../lib/formatters'
@@ -98,18 +99,33 @@ export function RankingSection({ type, onEdit }: RankingSectionProps) {
     return sortVendedores(afterFilter, type)
   }, [filtered, type, regras, campanhaEncerrada])
 
-  // Pódio: para markup, SEMPRE usa só elegíveis (mesmo campanha ativa)
-  // Para venda/pct, usa a displayList normal
+  // Pódio markup:
+  //   Campanha ATIVA    → todos os vendedores (sem filtro de elegibilidade)
+  //   Campanha ENCERRADA → apenas elegíveis, ordenados por markup desc
+  // Pódio venda/pct: usa a displayList normal
   const podiumList = useMemo(() => {
     if (type === 'markup') {
-      const elegiveis = filtered.filter(v => elegivelMarkup(v, regras))
-      return sortVendedores(elegiveis, 'markup')
+      if (campanhaEncerrada) {
+        const elegiveis = filtered.filter(v => elegivelMarkup(v, regras))
+        return sortVendedores(elegiveis, 'markup')
+      }
+      return sortVendedores(filtered, 'markup')
     }
     return displayList
-  }, [filtered, type, regras, displayList])
+  }, [filtered, type, regras, campanhaEncerrada, displayList])
 
   const top3 = podiumList.slice(0, 3)
-  const MEDALS = ['🥇', '🥈', '🥉']
+
+  // ID do vendedor que recebe o bônus de markup (melhor mk elegível fora do top 3)
+  const bonusVendId = useMemo(() => {
+    if (type !== 'markup') return null
+    const top3Ids = new Set(top3.map(v => v?.id))
+    const elegiveis = sortVendedores(
+      filtered.filter(v => elegivelMarkup(v, regras) && !top3Ids.has(v.id)),
+      'markup'
+    )
+    return elegiveis[0]?.id ?? null
+  }, [type, top3, filtered, regras])
 
   return (
     <div>
@@ -134,60 +150,132 @@ export function RankingSection({ type, onEdit }: RankingSectionProps) {
         </div>
 
         {/* Table */}
-        <div>
+        <div className="overflow-x-auto">
           {displayList.length === 0 ? (
             <div className="text-center py-8 text-muted2 text-sm italic">
               {campanhaEncerrada ? 'Nenhum vendedor elegível' : 'Nenhum vendedor'}
             </div>
           ) : (
-            <div className="space-y-0">
-              {displayList.map((v, i) => {
-                const p = pct(v.venda, v.meta)
-                const mk = v.markup || 0
-                const origIdx = allVendedores.findIndex(x => x.id === v.id)
-                const bColor = barColor(p)
-                const isEleg = type === 'markup' ? elegivelMarkup(v, regras) : true
+            <table className="w-full border-collapse min-w-[520px]">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="pb-2 px-1 text-[0.58rem] font-bold tracking-[1.5px] uppercase text-muted2 text-left w-8">#</th>
+                  <th className="pb-2 px-2 text-[0.58rem] font-bold tracking-[1.5px] uppercase text-muted2 text-left">Vendedor</th>
+                  <th className="pb-2 px-2 text-[0.58rem] font-bold tracking-[1.5px] uppercase text-muted2 text-left hidden md:table-cell">Filial</th>
+                  <th className="pb-2 px-2 text-[0.58rem] font-bold tracking-[1.5px] uppercase text-muted2 text-left hidden sm:table-cell">Progresso</th>
+                  <th className="pb-2 px-2 text-[0.58rem] font-bold tracking-[1.5px] uppercase text-muted2 text-center hidden lg:table-cell">Markup</th>
+                  <th className="pb-2 px-2 text-[0.58rem] font-bold tracking-[1.5px] uppercase text-muted2 text-right">Vendido</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayList.map((v, i) => {
+                  const p = pct(v.venda, v.meta)
+                  const mk = v.markup || 0
+                  const origIdx = allVendedores.findIndex(x => x.id === v.id)
+                  const bColor = barColor(p)
+                  const isEleg = elegivelMarkup(v, regras)
+                  const isPodium = top3.some(t => t?.id === v.id)
+                  const isBonusVend = bonusVendId === v.id
+                  const rowOpacity = type === 'markup' && !isEleg && !campanhaEncerrada ? 0.38 : 1
 
-                const value = type === 'venda' ? fmt(v.venda)
-                  : type === 'pct' ? fmtPct(p)
-                  : `${Number(mk).toFixed(2)}%`
+                  // Badge abaixo do nome
+                  let badge: React.ReactNode = null
+                  if (isPodium) {
+                    badge = (
+                      <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-gold/15 text-gold border border-gold/25 rounded px-1.5 py-px font-bold">
+                        🏆 Top 3
+                      </span>
+                    )
+                  } else if (isBonusVend) {
+                    badge = (
+                      <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-gold/10 text-gold border border-gold/20 rounded px-1.5 py-px font-bold">
+                        ⭐ Bônus R$ {Number(regras.bonusMk).toLocaleString('pt-BR')}
+                      </span>
+                    )
+                  } else if (isEleg) {
+                    badge = (
+                      <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-green2/10 text-green2 border border-green2/20 rounded px-1.5 py-px font-bold">
+                        ✅ Elegível
+                      </span>
+                    )
+                  } else if (type === 'markup' && !campanhaEncerrada) {
+                    badge = (
+                      <span className="inline-flex items-center gap-0.5 text-[0.52rem] bg-red2/10 text-red2 border border-red2/20 rounded px-1.5 py-px font-bold">
+                        ⛔ Inelegível
+                      </span>
+                    )
+                  }
 
-                return (
-                  <div
-                    key={v.id}
-                    onClick={() => onEdit(v.id)}
-                    className="flex items-center gap-2 sm:gap-3 py-1.5 px-2 rounded-lg hover:bg-surface2 cursor-pointer transition-colors animate-row-in"
-                    style={{
-                      animationDelay: `${i * 0.03}s`,
-                      opacity: type === 'markup' && !isEleg && !campanhaEncerrada ? 0.4 : 1,
-                    }}
-                  >
-                    <span className="font-display text-sm w-6 text-center flex-shrink-0">
-                      {i < 3 ? MEDALS[i] : <span className="text-muted">{i + 1}°</span>}
-                    </span>
-                    <Avatar vendedor={v} size={26} idx={origIdx} />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-xs truncate flex items-center gap-1">
-                        {v.nome}
-                        {type === 'markup' && !isEleg && !campanhaEncerrada && (
-                          <span className="text-[0.5rem] bg-red2/10 text-red2 rounded px-1 py-px">⛔</span>
-                        )}
-                      </div>
-                      <div className="text-[0.58rem] text-muted2">{v.filial} · {fmtPct(p)} meta</div>
-                    </div>
-                    {/* Mini progress */}
-                    <div className="hidden sm:block w-16">
-                      <div className="bg-surface2 rounded-full h-1 w-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(p, 100)}%`, background: bColor }} />
-                      </div>
-                    </div>
-                    <span className="font-display text-sm tracking-wide text-gold flex-shrink-0 text-right min-w-[55px]">
-                      {value}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
+                  // Markup badge color
+                  const mkBg = mk > regras.mkMin ? 'bg-green2/10 text-green2' : mk >= 20 ? 'bg-gold/10 text-gold' : 'bg-red2/10 text-red2'
+
+                  return (
+                    <tr
+                      key={v.id}
+                      onClick={() => onEdit(v.id)}
+                      className="border-b border-border/40 hover:bg-surface2 cursor-pointer transition-colors animate-row-in group"
+                      style={{ animationDelay: `${i * 0.025}s`, opacity: rowOpacity }}
+                    >
+                      {/* # */}
+                      <td className="py-2 px-1 w-8">
+                        <span className="font-display text-sm text-center block">
+                          {i < 3 ? ['🥇','🥈','🥉'][i] : <span className="text-muted text-xs">{i + 1}°</span>}
+                        </span>
+                      </td>
+
+                      {/* Vendedor */}
+                      <td className="py-2 px-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Avatar vendedor={v} size={28} idx={origIdx} />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-xs text-text truncate leading-tight">{v.nome}</div>
+                            <div className="text-[0.55rem] text-muted2 leading-tight md:hidden">{v.filial}</div>
+                            {badge && <div className="mt-0.5">{badge}</div>}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Filial */}
+                      <td className="py-2 px-2 hidden md:table-cell">
+                        <span className="text-[0.65rem] px-2 py-0.5 rounded bg-surface3 text-muted2 whitespace-nowrap">{v.filial}</span>
+                      </td>
+
+                      {/* Progresso */}
+                      <td className="py-2 px-2 hidden sm:table-cell min-w-[140px]">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-surface3 rounded-full h-1.5 overflow-hidden min-w-[60px]">
+                            <div
+                              className="h-full rounded-full transition-all duration-700"
+                              style={{ width: `${Math.min(p, 100)}%`, background: bColor }}
+                            />
+                          </div>
+                          <span className="text-[0.62rem] font-bold whitespace-nowrap" style={{ color: bColor }}>
+                            {fmtPct(p)}
+                          </span>
+                        </div>
+                        <div className="text-[0.55rem] text-muted2 mt-0.5 whitespace-nowrap">
+                          {fmt(v.venda)} / {fmt(v.meta)}
+                        </div>
+                      </td>
+
+                      {/* Markup */}
+                      <td className="py-2 px-2 hidden lg:table-cell text-center">
+                        <span className={`text-[0.68rem] font-bold px-2 py-0.5 rounded-full ${mkBg}`}>
+                          +{Number(mk).toFixed(2)}%
+                        </span>
+                      </td>
+
+                      {/* Vendido */}
+                      <td className="py-2 px-2 text-right">
+                        <span className="font-display text-sm tracking-wide text-gold whitespace-nowrap">
+                          {fmt(v.venda)}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           )}
         </div>
       </div>
