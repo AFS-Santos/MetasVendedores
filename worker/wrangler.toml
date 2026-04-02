@@ -1,0 +1,29 @@
+# ═══════════════════════════════════════════════════
+#  Meta Vendedores — PDF/PNG Worker
+#  Cloudflare Browser Rendering + R2
+# ═══════════════════════════════════════════════════
+
+name = "meta-vendedores-pdf"
+main = "src/index.ts"
+compatibility_date = "2025-09-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Browser Rendering binding
+[browser]
+binding = "BROWSER"
+
+# R2 bucket para fotos (mesmo bucket que o frontend usa)
+[[r2_buckets]]
+binding = "FOTOS_BUCKET"
+bucket_name = "meta-vendedores-fotos"
+
+# Variáveis de ambiente
+[vars]
+R2_PUBLIC_URL = "https://fotos.seu-dominio.com"
+# Domínios permitidos para CORS (seu dashboard)
+ALLOWED_ORIGINS = "https://meta-vendedores.pages.dev,http://localhost:5173"
+
+# Dev: usar browser remoto para testes locais
+# [browser]
+# binding = "BROWSER"
+# remote = true
